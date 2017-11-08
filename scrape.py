@@ -3,7 +3,7 @@ import urllib2, ssl
 import util
 
 
-PARENT_STUDY_LIST_URL = "ftp://ftp.ncbi.nlm.nih.gov/dbgap/studies/"
+TOP_STUDY_LIST_URL = "ftp://ftp.ncbi.nlm.nih.gov/dbgap/studies/"
 STUDY_DIRECTORY_URL_FORMAT = "ftp://ftp.ncbi.nlm.nih.gov/dbgap/studies/{0}/"
 STUDY_PAGE_URL_FORMAT = "https://www.ncbi.nlm.nih.gov/projects/gap/cgi-bin/molecular.cgi?study_id={0}"
 SEARCH_PAGE_URL_FORMAT = "https://www.ncbi.nlm.nih.gov/gap/?term={0}"
@@ -17,19 +17,19 @@ class Scraper:
     """
     Basic dbGaP scraping functionalities.
     Initialization:
-        scr = Scraper()  # Use entire list of parent studies
+        scr = Scraper()  # Use entire list of top studies
         scr = Scraper(["phs1234567", "phs7654321"])  # Use this partial list
-                                                     # of parent studies
+                                                     # of top studies
     Methods:
-        scr.get_parent_study_list(verbose=False)
-        scr.get_all_full_parent_study_ids(verbose=False)
+        scr.get_top_study_list(verbose=False)
+        scr.get_all_full_top_study_ids(verbose=False)
         scr.get_study_info(study_id, verbose=False)
     """
 
     def __init__(self, partial_study_ids=None):
         """
         If `partial_study_ids` is passed in, then methods like
-        `get_parent_study_list` and `get_all_full_parent_study_ids` will only
+        `get_top_study_list` and `get_all_full_top_study_ids` will only
         look through these study IDs.
         Note that this must be a list of strings, each of the form
         "phs1234567".
@@ -62,19 +62,19 @@ class Scraper:
             print("---success: nonempty response")
         return response
 
-    def get_parent_study_list(self, verbose=False):
+    def get_top_study_list(self, verbose=False):
         """
-        From the FTP mirror `PARENT_STUDY_LIST_URL`, which lists all parent
+        From the FTP mirror `TOP_STUDY_LIST_URL`, which lists all top
         study numbers (e.g. "phs1234567").
-        Returns a list of strings, each of which is a parent study ID.
+        Returns a list of strings, each of which is a top study ID.
         If `self.partial_study_ids` is set, return that instead.
         """
         if self.partial_study_ids:
             if verbose:
-                print("Using existing list of parent study partial IDs")
+                print("Using existing list of top study partial IDs")
             return self.partial_study_ids
 
-        study_list_page = self._read_page(PARENT_STUDY_LIST_URL, verbose=verbose)
+        study_list_page = self._read_page(TOP_STUDY_LIST_URL, verbose=verbose)
         study_list = [row.strip().split()[-1] for row in study_list_page.strip().split("\n")]
         # Remove first item, which is the table of contents
         return study_list[1:]
@@ -107,9 +107,9 @@ class Scraper:
             return contents[0].string + contents[1]
         return None
 
-    def _get_full_parent_study_id(self, study_id, verbose=False):
+    def _get_full_top_study_id(self, study_id, verbose=False):
         """
-        Given a parent study ID (e.g. "phs1234567"), finds the latest full
+        Given a top study ID (e.g. "phs1234567"), finds the latest full
         study ID from the FTP mirror (e.g. "phs1234567.v8.p1") in terms of
         version number, and returns that fully-formatted ID.
         This may not be truly the most recent, but this function will at least
@@ -132,21 +132,21 @@ class Scraper:
 
         return best_id
 
-    def get_all_full_parent_study_ids(self, verbose=False):
+    def get_all_full_top_study_ids(self, verbose=False):
         """
-        Using the list of all parent study IDs, finds the list of all full
-        study IDs for all parent studies. This function attempts to find the
+        Using the list of all top study IDs, finds the list of all full
+        study IDs for all top studies. This function attempts to find the
         most recent full ID, but it is not guaranteed. It will find _some_
-        valid full ID if possible. Returns a list of full parent study IDs,
-        parallel to the list of partial parent study IDs found by
-        `get_parent_study_list`.
+        valid full ID if possible. Returns a list of full top study IDs,
+        somewhat parallel to the list of partial top study IDs found by
+        `get_top_study_list`.
         If any of the studies consistently return empty responses, skip them.
         """
-        study_list = self.get_parent_study_list(verbose=verbose)
+        study_list = self.get_top_study_list(verbose=verbose)
         full_study_list = []
         for study_id in study_list:
             try:
-                full_study_id = self._get_full_parent_study_id(study_id, verbose=verbose)
+                full_study_id = self._get_full_top_study_id(study_id, verbose=verbose)
                 if verbose:
                     print("Full study ID {0} -> {1}".format(study_id, full_study_id))
                 full_study_list.append(full_study_id)
@@ -188,7 +188,7 @@ class Scraper:
         data_type = data_type.lower()
         return "whole exome" in data_type or "whole genome" in data_type
    
-    def _get_num_sequences(self, soup, study_id):
+    def _get_substudy_sequences(self, soup, study_id):
         """
         Given the parser object for a study's info page, and the fully-
         formatted study ID, finds the number of sequences of interest for the
@@ -196,9 +196,10 @@ class Scraper:
         the latest version instead.
         Returns a dictionary of dictionaries, mapping substudies to the number
         of sequences of each type of interest:
-            phs1234567.v1.p1: {type1: 100},
-            phs7654321.v8.p3: {type1: 200, type2: 300}
+            phs1234567.v1.p1: {seqs: {type1: 100}},
+            phs7654321.v8.p3: {seqs: {type1: 200, type2: 300}}
             ...
+        Also returns the `study_id`, or a newer version if found.
         """
         # Check this really is the latest version
         study_history_div = soup.find("div", {"id": "studyHistoryTable"})
@@ -208,13 +209,13 @@ class Scraper:
             study_history = [item.td.a.string.strip() for item in study_history_table if item.name and item.td and item.td.a]
             newest_id = study_history[-1]
             if newest_id and util.version_num(newest_id) > util.version_num(study_id):
-                return self._get_num_sequences(self._fetch_study_page(newest_id), newest_id)
+                return self._get_substudy_sequences(self._fetch_study_page(newest_id), newest_id)
     
         table = soup.find("tbody")
-        seqs = {}
+        subs = {}
 
         if not table:
-            return seqs
+            return subs, study_id
     
         for row in table.contents:
             if not row.name:
@@ -228,51 +229,57 @@ class Scraper:
            
             num = sum(int(x) for x in data_nums[::2])
             try:
-                seqs[study][data_type] = num
+                subs[study]["seqs"][data_type] = num
             except KeyError:
-                seqs[study] = {data_type: num}
+                subs[study] = {"seqs": {data_type: num}}
 
-        return seqs
+        return subs, study_id
 
-    def get_study_info(self, study_id, verbose=False):
+    def get_study_info(self, study_id, substudy_names=False, verbose=False):
         """
         Given a fully-formatted `study_id`, finds the name and number of
         sequences of interest for the most recent version of the study.
-        Returns a multi-level dictionary with top-level keys: "name", "seqs".
+        If `substudy_names` is True, also include the substudy names.
+        Otherwise, these keys are missing.
+        Returns a multi-level dictionary with top-level keys: "name", "subs".
             id:
                 full: study_id
-                part: study_id partial ID
+                part: partial study_id
                 version: version number
             name: study_name
-            seqs:
-                phs1234567.v1.p1: {type1: 100},
-                phs7654321.v8.p3: {type1: 200, type2: 300}
+            subs:
+                phs1234567.v1.p1: {name: ..., seqs: {type1: 100}},
+                phs7654321.v8.p3: {name: ..., seqs: {type1: 200, type2: 300}}
         Returns None if basic information like the title cannot be found.
         """
         soup = self._fetch_study_page(study_id, verbose=verbose)
         name = self._get_study_title(soup)
         if not name:
             return None
-        seqs = self._get_num_sequences(soup, study_id)
+        subs, study_id  = self._get_substudy_sequences(soup, study_id)
+        # ^-- also update study_id, since a newer version may have been found
+        if substudy_names:
+            for substudy in subs:
+                name = self._get_study_title(self._fetch_study_page(substudy, verbose=verbose))
+                subs[substudy]["name"] = name if name else ""
         fields = util.study_id_fields(study_id)
         return {
             "id": {"full": study_id, "part": fields[0], "version": fields[1]},
             "name": name,
-            "seqs": seqs
+            "subs": subs
         }
-
 
 
 if __name__ == "__main__":
     # Testing
     test_ids = ['phs000545', 'phs000007', 'phs000178', 'phs000401', 'phs000378', 'phs000123', 'phs000227', 'phs000184', 'phs000301', 'phs000342']
-    verbose = False
+    verbose = True
 
     scr = Scraper(test_ids)
 
-    full_study_list = scr.get_all_full_parent_study_ids(verbose=verbose)
+    full_study_list = scr.get_all_full_top_study_ids(verbose=verbose)
     print(full_study_list)
 
     for study_id in full_study_list:
         if study_id is not None:
-            print(scr.get_study_info(study_id, verbose=verbose))
+            print(scr.get_study_info(study_id, substudy_names=True, verbose=verbose))

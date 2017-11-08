@@ -7,11 +7,11 @@ class Updater:
     Updater for scraped information from dbGaP.
     Initialization:
         # Read from infile, write to outfile
-        # Use entire list of parent studies from dbGaP
+        # Use entire list of top-level studies from dbGaP
         upd = Updater("infile.json", "outfile.json")
     
         # No infile to read from, do not write output to outfile
-        # Use this partial list of parent studies
+        # Use this partial list of top-level studies
         upd = Updater(["phs1234567", "phs7654321"])
     Methods:
         upd.update_studies(fs=None, verbose=False)
@@ -38,15 +38,15 @@ class Updater:
         Returns a list of dictionaries.
         """
         scr = Scraper(partial_study_ids=self.partial_study_ids)
-        full_study_list = scr.get_all_full_parent_study_ids(verbose=verbose)
+        full_study_list = scr.get_all_full_top_study_ids(verbose=verbose)
 
         if verbose:
-            print("Fetching info for {0} parent studies".format(len(full_study_list)))
+            print("Fetching info for {0} top-level studies".format(len(full_study_list)))
    
         study_info = []
         for study_id in full_study_list:
             if study_id is not None:
-                info = scr.get_study_info(study_id, verbose=verbose)
+                info = scr.get_study_info(study_id, substudy_names=True, verbose=verbose)
                 if info:
                     study_info.append(info)
                     if verbose:
@@ -94,26 +94,29 @@ class Updater:
         if not fs:
             fs = sys.stdout
 
-        def write_info(info):
-            name = info["name"].encode("ascii", "ignore")
-            fs.write("{0}: {1}\n".format(info["id"]["full"], name))
-            for seq in info["seqs"]:
-                seq_nums = ", ".join(["{0} {1}".format(num, seq_type) for seq_type, num in info["seqs"][seq].iteritems()])
-                fs.write("\t{0}: {1}\n".format(seq, seq_nums))
+        def write_top_study(top_study):
+            name = top_study["name"].encode("ascii", "ignore")
+            fs.write("{0}: {1}\n".format(top_study["id"]["full"], name))
+            for sub in top_study["subs"]:
+                fs.write("\t{0}\n".format(sub))
+                if "name" in top_study["subs"][sub]:
+                    sub_title = top_study["subs"][sub]["name"].encode("ascii", "ignore")
+                    if sub_title:
+                        fs.write("\t\t{0}\n".format(sub_title))
+                seq_nums = ", ".join(["{0} {1}".format(num, seq_type) for seq_type, num in top_study["subs"][sub]["seqs"].iteritems()])
+                fs.write("\t\t{0}\n".format(seq_nums))
 
         fs.write("New studies\n")
         fs.write("----------------------------------------\n")
-        for info in updates["new"]:
-            if info["seqs"]:
-                # Only care about new studies with sequences of interest
-                write_info(info)
+        for top_study in updates["new"]:
+            write_top_study(top_study)
 
         fs.write("\n")
 
         fs.write("Updated studies\n")
         fs.write("----------------------------------------\n")
-        for info in updates["updates"]:
-            write_info(info)
+        for top_study in updates["updates"]:
+            write_top_study(top_study)
 
     def update_studies(self, fs=None, verbose=False):
         """
@@ -134,10 +137,57 @@ class Updater:
         updates = self._compare_study_info(old_info, new_info)
         self._print_updates(updates, fs=fs)
 
-                
+
+def export_study_table(input_json_path, output_table_path):
+    """
+    Given the `input_json_path`, where the JSON of all studies in dbGaP
+    are stored, create a TSV of that information.
+    Creates a row for each study or substudy, and records the name, ID,
+    and number of whole genome and whole exome sequences. For top-level
+    studies, the number of sequences is the sum of its substudies. For
+    top-level studies without proper substudies, its substudy is itself,
+    and this duplicate is removed.
+    """
+    studies = util.import_json(input_json_path)
+
+    def write_line(fs, study_id, parent_id, wgs_num, wes_num, name):
+        wgs_num, wes_num = str(wgs_num), str(wes_num)
+        name = name.encode("ascii", "ignore")
+        fs.write("\t".join([study_id, parent_id, wgs_num, wes_num, name]) + "\n")
+
+    def get_wgs(substudy):
+        wgs_keys = [key for key in substudy["seqs"] if "whole genome" in key.lower()]
+        return substudy["seqs"][wgs_keys[0]] if wgs_keys else 0
+
+    def get_wes(substudy):
+        wes_keys = [key for key in substudy["seqs"] if "whole exome" in key.lower()]
+        return substudy["seqs"][wes_keys[0]] if wes_keys else 0
+
+    with open(output_table_path, "w") as outfile:
+        outfile.write("\t".join(["study_id", "parent_id", "wgs_num", "wes_num", "name"]) + "\n")
+        for study in studies:
+            substudies = study["subs"]
+            if study["id"]["full"] in substudies:
+                # The only "substudy" is itself
+                substudy = substudies[study["id"]["full"]]
+                wgs_num, wes_num = get_wgs(substudy), get_wes(substudy)
+                write_line(outfile, study["id"]["full"], "NA", wgs_num, wes_num, substudy["name"])
+            else:
+                nums = {}
+                for substudy_id in substudies:
+                    substudy = substudies[substudy_id]
+                    nums[substudy_id] = (get_wgs(substudy), get_wes(substudy))
+                wgs_total = sum(nums[ssi][0] for ssi in nums)
+                wes_total = sum(nums[ssi][1] for ssi in nums)
+                write_line(outfile, study["id"]["full"], "NA", wgs_total, wes_total, study["name"])
+                for substudy_id in substudies:
+                    write_line(outfile, substudy_id, study["id"]["full"], nums[substudy_id][0], nums[substudy_id][1], substudy["name"])
+
+
+
 if __name__ == "__main__":
     # Testing
     test_ids = ['phs000545', 'phs000007', 'phs000178', 'phs000401', 'phs000378', 'phs000123', 'phs000227', 'phs000184', 'phs000301', 'phs000342']
     
-    upd = Updater(None, "outfile.json", test_ids)
+    upd = Updater(None, "data/outfile.json", test_ids)
     upd.update_studies(verbose=True)
