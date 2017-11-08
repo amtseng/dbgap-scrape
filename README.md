@@ -22,13 +22,42 @@ optional arguments:
   -v, --verbose         If set, print out (to stdout) scraping updates.
 ```
 
-#### Functions of interest
-```
-updater.export_study_table(input_json_path, output_table_path)
-    Writes the JSON of all dbGaP studies/substudies into a table
+`INFILE`
+- Specifies an existing JSON file containing the results of scraping dbGaP
+- This should almost certainly be the outfile of a previous execution of this program
+- If this file is not specified, it is interpreted as an empty set (no existing information)
 
-scrape.Scraper._match_data_type(self, data_type)
-    For a type of sequencing data, determine whether or not to record it.
-    For now, this only looks for whole genome/exome sequences, but this may
-    be tweaked manually.
-```
+`OUTFILE`
+- Specifies the file to write the JSON object containing the results of scraping dbGaP
+- This file will contain all the information scraped from this execution
+
+`UPDATEFILE`
+- Specifies the file in which to write the new and updated studies
+- Studies with no sequence data of interest at all are ignored
+- The output is in human-readable format, split into sections:
+    - New studies: completely new top-level studies
+    - Updated studies: top-level studies that were in the `INFILE`, but have been updated somehow
+- If this argument is not provided, the diff is still calculated, but written to `stdout` instead
+
+**Example invocations**
+
+`python main.py -o data/studies.json -u diff.txt`
+- Scrapes all information down, without any knowledge of previous scrapes
+- `diff.txt` will contain all scraped studies with some sequences of interest
+`python main.py -i data/studies.json -o data/studies.json -u diff.txt`
+- If this program has previously been run with the previous results stored at `data/studies.json`, this will scrape dbGaP again and overwrite it with the newest data
+- Before overwriting, the diff is computed and written to `diff.txt`
+
+#### Functions of interest
+`updater.export_study_table(input_json_path, output_table_path)`
+- Writes the JSON of all dbGaP studies/substudies into a table
+
+`scrape.Scraper._match_data_type(self, data_type)`
+- For a type of sequencing data, determine whether or not to record it
+- For now, this only looks for whole genome/exome sequences, but this may be tweaked manually.
+
+`scrape.Scraper._read_page(self, url, timeout=5, retries=3, verbose=False)`
+- Performs the basic function of reading a page from a URL
+- The default timeout (in seconds) may be changed, as well as the number of retries
+- Retries are performed when the request times out, or a blank page is returned
+
