@@ -1,7 +1,15 @@
 ### Scraper for dbGaP
 ---------
+#### Scraper `run_update.sh` usage
+```
+usage: sh run_update.sh <email>
+```
+- Scrapes all the studies from dbGaP, and updates the result in a stored "database" file
+- Computes the differential update (any new or updated studies), and sends an email containing this update to the provided email address
 
-#### Usage
+#### Scraper `main.py` usage
+- The `main.py` file allows a slightly lower-level invocation of the scraper.
+
 ```
 usage: main.py [-h] [-i INFILE] [-o OUTFILE] [-u UPDATEFILE] [-v]
 
@@ -54,10 +62,11 @@ optional arguments:
 
 `scrape.Scraper._match_data_type(self, data_type)`
 - For a type of sequencing data, determine whether or not to record it
-- For now, this only looks for whole genome/exome sequences, but this may be tweaked manually.
+- For now, this only looks for whole genome/exome sequences, but this may be tweaked manually
 
 `scrape.Scraper._read_page(self, url, timeout=5, retries=3, verbose=False)`
 - Performs the basic function of reading a page from a URL
 - The default timeout (in seconds) may be changed, as well as the number of retries
 - Retries are performed when the request times out, or a blank page is returned
+- This default setting of a 5-second timeout and 3 retries is recommended
 
