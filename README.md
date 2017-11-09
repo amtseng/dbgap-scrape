@@ -38,6 +38,7 @@ optional arguments:
 `OUTFILE`
 - Specifies the file to write the JSON object containing the results of scraping dbGaP
 - This file will contain all the information scraped from this execution
+- If this file is not specified, the results of this newest scrape will not be saved anywhere (nor will it be written to `stdout`)
 
 `UPDATEFILE`
 - Specifies the file in which to write the new and updated studies
