@@ -40,6 +40,11 @@ def import_json(file_path):
 
 
 def export_json(file_path, obj, pretty=True):
+    """
+    Export JSON object `obj` to `file_path`. If `pretty` is set (by default
+    it is), pretty-print `obj` to `file_path`, with proper indentation of 2
+    spaces per level.
+    """
     if pretty:
         json_str = json.dumps(obj, indent=2)
     else:
