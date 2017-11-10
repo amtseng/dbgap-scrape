@@ -178,6 +178,22 @@ class Scraper:
         text = span.text
         return " ".join(text.split())
    
+    def _get_study_consents(self, soup):
+        """
+        Given the parser object for a study's info page, returns the list of
+        consent groups associated with the study.
+        Returns an empty list if there are no consent groups (no molecular
+        data).
+        """
+        legend_finder = lambda tag: tag.name == "b" and tag.string and "Legend" in tag.string
+        legend = soup.find(legend_finder)
+        if not legend:
+            return []
+        consent_list = legend.next_sibling.next_sibling
+        # ^-- there are two next_sibling's, because there is a new-line char
+        consents = [tag.text for tag in consent_list.find_all("b")]
+        return consents
+         
     def _match_data_type(self, data_type):
         """
         Given a sequencing data type, returns whether or not the data type is
@@ -187,7 +203,7 @@ class Scraper:
         """
         data_type = data_type.lower()
         return "whole exome" in data_type or "whole genome" in data_type
-   
+
     def _get_substudy_sequences(self, soup, study_id):
         """
         Given the parser object for a study's info page, and the fully-
@@ -241,7 +257,8 @@ class Scraper:
         sequences of interest for the most recent version of the study.
         If `substudy_names` is True, also include the substudy names.
         Otherwise, these keys are missing.
-        Returns a multi-level dictionary with top-level keys: "name", "subs".
+        Returns a multi-level dictionary with top-level keys: "id", "name",
+        "subs", "consents"
             id:
                 full: study_id
                 part: partial study_id
@@ -250,6 +267,7 @@ class Scraper:
             subs:
                 phs1234567.v1.p1: {name: ..., seqs: {type1: 100}},
                 phs7654321.v8.p3: {name: ..., seqs: {type1: 200, type2: 300}}
+            consents: [consent_group1, consent_group2, ...]
         Returns None if basic information like the title cannot be found.
         """
         soup = self._fetch_study_page(study_id, verbose=verbose)
@@ -263,17 +281,19 @@ class Scraper:
                 name = self._get_study_title(self._fetch_study_page(substudy, verbose=verbose))
                 subs[substudy]["name"] = name if name else ""
         fields = util.study_id_fields(study_id)
+        consents = self._get_study_consents(soup)
         return {
             "id": {"full": study_id, "part": fields[0], "version": fields[1]},
             "name": name,
-            "subs": subs
+            "subs": subs,
+            "consents": consents
         }
 
 
 if __name__ == "__main__":
     # Testing
-    test_ids = ['phs000545', 'phs000007', 'phs000178', 'phs000401', 'phs000378', 'phs000123', 'phs000227', 'phs000184', 'phs000301', 'phs000342']
-    verbose = True
+    test_ids = ['phs000545', 'phs000007', 'phs000178', 'phs000401', 'phs000378', 'phs000123', 'phs000227', 'phs000184', 'phs000301', 'phs000342', 'phs000001', 'phs000287']
+    verbose = False
 
     scr = Scraper(test_ids)
 
@@ -282,4 +302,6 @@ if __name__ == "__main__":
 
     for study_id in full_study_list:
         if study_id is not None:
+            print(study_id)
             print(scr.get_study_info(study_id, substudy_names=True, verbose=verbose))
+            print("")
