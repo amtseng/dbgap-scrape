@@ -198,7 +198,7 @@ def export_study_table(input_json_path, output_table_path):
                 write_line(outfile, study["id"]["full"], "NA", wgs_total, wes_total, consents, study["name"])
                 for substudy_id in substudies:
                     # Note consents are written only for top-level studies
-                    write_line(outfile, substudy_id, study["id"]["full"], nums[substudy_id][0], nums[substudy_id][1], [], substudy["name"])
+                    write_line(outfile, substudy_id, study["id"]["full"], nums[substudy_id][0], nums[substudy_id][1], "", substudy["name"])
 
 
 

@@ -71,3 +71,6 @@ optional arguments:
 - Retries are performed when the request times out, or a blank page is returned
 - This default setting of a 5-second timeout and 3 retries is recommended
 
+`collate`
+- This script is used to take the results of a scrape and create tables for viewing the studies that have not been requested (or are available as is)
+- `collate.py` is standalone and does not affect the behavior of the main intended function of the scraper
