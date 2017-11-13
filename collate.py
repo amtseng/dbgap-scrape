@@ -100,11 +100,12 @@ def export_studies_with_sequences(req_path, not_req_path, studies, req_studies):
     
 
 if __name__ == "__main__":
-    study_json_path = "results/studies.json"
-    study_table_path = "results/dbgap_studies.tsv"
-    req_studies_path = "results/requested_studies.txt"
-    existing_studies_path = "results/existing_top_level_studies.tsv"
-    new_studies_path = "results/new_top_level_studies.tsv"
+    study_json_path = "results/studies.json"  # Output JSON of a scraping run
+    req_studies_path = "results/requested_studies.txt"  # List of all studies that have been requested already
+
+    study_table_path = "results/dbgap_studies.tsv"  # Where to put table of all studies
+    existing_studies_path = "results/existing_top_level_studies.tsv"  # Where to put table of all requested studies
+    new_studies_path = "results/new_top_level_studies.tsv"  # Where to put table of new non-requested studies
 
     update.export_study_table(study_json_path, study_table_path)
     studies = import_scraped_studies(study_table_path)
