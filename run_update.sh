@@ -15,6 +15,7 @@ python /cluster/u/amtseng/dbgap_scrape/main.py -i $json -o $json -u $diff -v
 
 # Email contents of diff
 echo "Subject: dbGaP scrape: new studies and updates" > $email
+echo "To: $1" >> $email
 cat $diff >> $email
 sendmail $1 < $email
 rm $email
