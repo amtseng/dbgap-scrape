@@ -1,5 +1,5 @@
 import util
-from scrape import Scraper
+from scrape import Scraper, EmptyResponseException
 import sys
 
 class Updater:
@@ -46,7 +46,12 @@ class Updater:
         study_info = []
         for study_id in full_study_list:
             if study_id is not None:
-                info = scr.get_study_info(study_id, substudy_names=True, verbose=verbose)
+                try:
+                    info = scr.get_study_info(study_id, substudy_names=True, verbose=verbose)
+                except EmptyResponseException:
+                    if verbose:
+                        print("No response for {0}".format(study_id))
+                    continue
                 if info:
                     study_info.append(info)
                     if verbose:
@@ -162,6 +167,9 @@ def export_study_table(input_json_path, output_table_path):
         consent_groups, name
 
     """
+    is_wgs = lambda key: "whole genome" in key or "wgs" in key
+    is_wes = lambda key: "whole exome" in key or "wes" in key or "wxs" in key
+
     studies = util.import_json(input_json_path)
 
     def write_line(fs, study_id, parent_id, wgs_num, wes_num, consents, name):
@@ -171,11 +179,11 @@ def export_study_table(input_json_path, output_table_path):
         fs.write("\t".join([study_id, parent_id, wgs_num, wes_num, seq_total, consents, name]) + "\n")
 
     def get_wgs(substudy):
-        wgs_keys = [key for key in substudy["seqs"] if "whole genome" in key.lower()]
+        wgs_keys = [key for key in substudy["seqs"] if is_wgs(key.lower())]
         return substudy["seqs"][wgs_keys[0]] if wgs_keys else 0
 
     def get_wes(substudy):
-        wes_keys = [key for key in substudy["seqs"] if "whole exome" in key.lower()]
+        wes_keys = [key for key in substudy["seqs"] if is_wes(key.lower())]
         return substudy["seqs"][wes_keys[0]] if wes_keys else 0
 
     with open(output_table_path, "w") as outfile:

@@ -202,7 +202,7 @@ class Scraper:
         is of interest.
         """
         data_type = data_type.lower()
-        return "whole exome" in data_type or "whole genome" in data_type
+        return "whole exome" in data_type or "whole genome" in data_type or "wgs" in data_type or "wes" in data_type or "wxs" in data_type
 
     def _get_substudy_sequences(self, soup, study_id):
         """
